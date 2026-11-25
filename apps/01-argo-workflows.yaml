@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-workflows
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "2"}
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-workflows
+    targetRevision: "*"                # latest; run scripts/pin-versions.sh once it works
+    helm:
+      valuesObject:
+        controller:
+          workflowNamespaces: [lakehouse]
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 256Mi}}
+        server:
+          authModes: [server]            # no login screen: fine for a local demo
+          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 256Mi}}
+        workflow:
+          rbac: {create: false}          # our own ServiceAccount and Role are in platform/workflow-rbac.yaml
+  destination: {server: https://kubernetes.default.svc, namespace: argo}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]

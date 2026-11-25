@@ -1,0 +1,13 @@
+version: 2
+sources:
+  - name: silver
+    database: lakehouse
+    schema: silver
+    tables:
+      - name: orders
+models:
+  - name: daily_revenue
+    description: "Gold: revenue and order count per day, built from Silver orders"
+    columns:
+      - name: order_date
+        tests: [not_null, unique]

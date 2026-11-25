@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "3"}
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana
+    targetRevision: "*"                # latest; run scripts/pin-versions.sh once it works
+    helm:
+      valuesObject:
+        adminUser: admin
+        adminPassword: lakehouse-demo   # demo value only
+        persistence: {enabled: false}
+        resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 256Mi}}
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: Prometheus
+                type: prometheus
+                access: proxy
+                url: http://prometheus-server.monitoring.svc.cluster.local
+                isDefault: true
+        dashboardProviders:
+          dashboardproviders.yaml:
+            apiVersion: 1
+            providers:
+              - name: default
+                orgId: 1
+                type: file
+                disableDeletion: false
+                editable: true
+                options: {path: /var/lib/grafana/dashboards/default}
+        dashboards:
+          default:
+            k8s-global: {gnetId: 15757, datasource: Prometheus}
+            k8s-pods: {gnetId: 15760, datasource: Prometheus}
+  destination: {server: https://kubernetes.default.svc, namespace: monitoring}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

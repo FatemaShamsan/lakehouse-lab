@@ -1,0 +1,45 @@
+# The "operational database": the source system the pipeline reads from (stand-in for Aurora PostgreSQL).
+# Demo credentials only. Never commit real passwords to Git.
+apiVersion: v1
+kind: Secret
+metadata: {name: postgres-credentials, namespace: lakehouse}
+stringData:
+  POSTGRES_USER: lakehouse
+  POSTGRES_PASSWORD: lakehouse-demo
+---
+apiVersion: v1
+kind: Service
+metadata: {name: postgres, namespace: lakehouse}
+spec:
+  selector: {app: postgres}
+  ports: [{port: 5432, targetPort: 5432}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: postgres, namespace: lakehouse}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: {matchLabels: {app: postgres}}
+  template:
+    metadata: {labels: {app: postgres}}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports: [{containerPort: 5432}]
+          envFrom: [{secretRef: {name: postgres-credentials}}]
+          env:
+            - {name: POSTGRES_DB, value: orders}          # created on first start
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "lakehouse", "-d", "orders"]}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {memory: 384Mi}}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: {requests: {storage: 2Gi}}

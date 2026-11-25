@@ -1,0 +1,12 @@
+# The "app of apps". Argo CD watches the apps/ folder in your Git repo and creates one Application per file.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: {name: root, namespace: argocd}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/FatemaShamsan/lakehouse-lab.git
+    targetRevision: main
+    path: apps
+  destination: {server: https://kubernetes.default.svc, namespace: argocd}
+  syncPolicy: {automated: {prune: true, selfHeal: true}}

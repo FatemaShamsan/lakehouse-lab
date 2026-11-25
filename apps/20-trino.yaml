@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trino
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "2"}
+spec:
+  project: default
+  source:
+    repoURL: https://trinodb.github.io/charts
+    chart: trino
+    targetRevision: "*"                # latest; run scripts/pin-versions.sh once it works
+    helm:
+      valuesObject:
+        server: {workers: 1}
+        coordinator:
+          jvm: {maxHeapSize: "2G"}
+          resources: {requests: {cpu: 250m, memory: 2Gi}, limits: {memory: 3Gi}}
+        worker:
+          jvm: {maxHeapSize: "2G"}
+          resources: {requests: {cpu: 250m, memory: 2Gi}, limits: {memory: 3Gi}}
+        additionalCatalogs:
+          lakehouse: |
+            connector.name=iceberg
+            iceberg.catalog.type=rest
+            iceberg.rest-catalog.uri=http://iceberg-rest.lakehouse:8181
+            iceberg.rest-catalog.warehouse=s3://warehouse/
+            fs.native-s3.enabled=true
+            s3.endpoint=http://localstack.lakehouse:4566
+            s3.region=us-east-1
+            s3.path-style-access=true
+            s3.aws-access-key=test
+            s3.aws-secret-key=test
+  destination: {server: https://kubernetes.default.svc, namespace: lakehouse}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

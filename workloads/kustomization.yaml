@@ -1,0 +1,16 @@
+# Turns the code files into ConfigMaps (the workflow mounts them), and adds the workflow definitions.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: lakehouse
+generatorOptions:
+  disableNameSuffixHash: true      # keep stable names so the WorkflowTemplate can refer to them
+configMapGenerator:
+  - name: code-generator
+    files: [generator/generate_orders.py]
+  - name: code-ingest
+    files: [spark/ingest_orders.py]
+  - name: code-dbt
+    files: [dbt/dbt_project.yml, dbt/profiles.yml, dbt/sources.yml, dbt/daily_revenue.sql]
+resources:
+  - pipeline.yaml
+  - schedule.yaml

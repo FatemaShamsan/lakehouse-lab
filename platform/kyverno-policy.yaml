@@ -1,0 +1,16 @@
+# Kyverno >= 1.20 removed the legacy ClusterPolicy; this uses the CEL-based ValidatingPolicy.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationActions: [Audit]      # report only; switch to [Deny] to block
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: "object.spec.containers.all(c, !c.image.endsWith(':latest'))"
+      message: "Container images must not use the ':latest' tag."

@@ -1,0 +1,18 @@
+# The pipeline: code (as ConfigMaps built by kustomize) + the Argo Workflows template and schedule.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: workloads
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "3"}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/FatemaShamsan/lakehouse-lab.git
+    targetRevision: main
+    path: workloads
+  destination: {server: https://kubernetes.default.svc, namespace: lakehouse}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true, SkipDryRunOnMissingResource=true]   # Workflow CRDs arrive with Argo Workflows
+    retry: {limit: 8, backoff: {duration: 20s, factor: 2}}

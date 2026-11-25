@@ -1,0 +1,67 @@
+# The pipeline as an Argo Workflows DAG:  generate orders -> ingest + clean (Spark) -> build Gold (dbt)
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata: {name: lakehouse-pipeline, namespace: lakehouse}
+spec:
+  serviceAccountName: workflow-runner
+  entrypoint: main
+  ttlStrategy: {secondsAfterCompletion: 86400}     # clean up finished runs after a day
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - {name: generate, template: generate}
+          - {name: ingest, template: ingest, dependencies: [generate]}
+          - {name: dbt, template: dbt, dependencies: [ingest]}
+
+    - name: generate
+      volumes: [{name: code, configMap: {name: code-generator}}]
+      container:
+        image: python:3.12-slim
+        command: [bash, -c]
+        args: ["pip install --quiet psycopg2-binary && python /code/generate_orders.py"]
+        envFrom: [{secretRef: {name: postgres-credentials}}]
+        volumeMounts: [{name: code, mountPath: /code}]
+        resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 256Mi}}
+
+    - name: ingest
+      volumes: [{name: code, configMap: {name: code-ingest}}]
+      container:
+        image: apache/spark:3.5.3-python3
+        command: ["/opt/spark/bin/spark-submit"]
+        args:
+          - --master=local[2]
+          - --driver-memory=1g
+          - --packages=org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.7.1,org.apache.iceberg:iceberg-aws-bundle:1.7.1,org.postgresql:postgresql:42.7.4
+          - --conf=spark.jars.ivy=/tmp/ivy
+          - --conf=spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+          - --conf=spark.sql.catalog.lh=org.apache.iceberg.spark.SparkCatalog
+          - --conf=spark.sql.catalog.lh.type=rest
+          - --conf=spark.sql.catalog.lh.uri=http://iceberg-rest:8181
+          - --conf=spark.sql.catalog.lh.warehouse=s3://warehouse/
+          - --conf=spark.sql.catalog.lh.io-impl=org.apache.iceberg.aws.s3.S3FileIO
+          - --conf=spark.sql.catalog.lh.s3.endpoint=http://localstack:4566
+          - --conf=spark.sql.catalog.lh.s3.path-style-access=true
+          - /code/ingest_orders.py
+        envFrom:
+          - {secretRef: {name: s3-credentials}}
+          - {secretRef: {name: postgres-credentials}}
+        volumeMounts: [{name: code, mountPath: /code}]
+        resources: {requests: {cpu: 500m, memory: 1Gi}, limits: {memory: 2Gi}}
+
+    - name: dbt
+      volumes: [{name: code, configMap: {name: code-dbt}}]
+      container:
+        image: python:3.12-slim
+        command: [bash, -c]
+        args:
+          - |
+            set -e
+            mkdir -p /tmp/dbt/models && cd /tmp/dbt
+            cp /code/dbt_project.yml /code/profiles.yml .
+            cp /code/sources.yml /code/daily_revenue.sql models/
+            pip install --quiet dbt-trino
+            dbt run  --profiles-dir .
+            dbt test --profiles-dir .
+        volumeMounts: [{name: code, mountPath: /code}]
+        resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}

@@ -1,0 +1,6 @@
+# Local files that must never be committed
+trino.log
+tofu/.terraform/
+tofu/*.tfstate
+tofu/*.tfstate.*
+*.log

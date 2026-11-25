@@ -1,0 +1,18 @@
+# Plain manifests: namespace, LocalStack, Iceberg catalog, PostgreSQL, Gateway, Kyverno policy, workflow permissions.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "1"}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/FatemaShamsan/lakehouse-lab.git
+    targetRevision: main
+    path: platform
+  destination: {server: https://kubernetes.default.svc, namespace: lakehouse}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]
+    retry: {limit: 5, backoff: {duration: 20s, factor: 2}}   # waits for the Gateway and Kyverno CRDs

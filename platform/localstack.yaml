@@ -1,0 +1,31 @@
+# LocalStack: a local copy of the AWS API (S3, IAM, KMS, Secrets Manager, STS) on port 4566.
+# Since March 2026 the newest images need a free account and LOCALSTACK_AUTH_TOKEN.
+# Version 4.14 was the last without that requirement (no longer updated). Check the current terms.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: localstack, namespace: lakehouse}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: localstack}}
+  template:
+    metadata: {labels: {app: localstack}}
+    spec:
+      containers:
+        - name: localstack
+          image: localstack/localstack:4.14      # pinned on purpose (see note above)
+          env:
+            - {name: SERVICES, value: "s3,iam,kms,secretsmanager,sts"}
+            - name: LOCALSTACK_AUTH_TOKEN         # only needed for newer images
+              valueFrom: {secretKeyRef: {name: localstack-auth, key: token, optional: true}}
+          ports: [{containerPort: 4566}]
+          readinessProbe: {httpGet: {path: /_localstack/health, port: 4566}, periodSeconds: 5, initialDelaySeconds: 10}
+          resources: {requests: {cpu: 100m, memory: 512Mi}, limits: {memory: 1Gi}}
+          volumeMounts: [{name: data, mountPath: /var/lib/localstack}]
+      volumes: [{name: data, emptyDir: {}}]       # data is lost if the pod restarts
+---
+apiVersion: v1
+kind: Service
+metadata: {name: localstack, namespace: lakehouse}
+spec:
+  selector: {app: localstack}
+  ports: [{port: 4566}]

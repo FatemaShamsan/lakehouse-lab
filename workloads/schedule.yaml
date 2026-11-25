@@ -1,0 +1,12 @@
+# The nightly run. Starts suspended so a sleeping laptop does not surprise you.
+# To enable it, change suspend to false here, commit and push: Argo CD will apply it.
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata: {name: nightly-lakehouse, namespace: lakehouse}
+spec:
+  schedules: ["0 1 * * *"]
+  timezone: Asia/Bahrain
+  concurrencyPolicy: Forbid
+  suspend: true
+  workflowSpec:
+    workflowTemplateRef: {name: lakehouse-pipeline}
