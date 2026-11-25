@@ -9,7 +9,7 @@ spec:
   source:
     repoURL: https://trinodb.github.io/charts
     chart: trino
-    targetRevision: "*"                # latest; run scripts/pin-versions.sh once it works
+    targetRevision: "1.45.0"
     helm:
       valuesObject:
         server: {workers: 1}

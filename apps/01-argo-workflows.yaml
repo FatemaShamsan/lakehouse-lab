@@ -9,7 +9,7 @@ spec:
   source:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-workflows
-    targetRevision: "*"                # latest; run scripts/pin-versions.sh once it works
+    targetRevision: "2.0.18"
     helm:
       valuesObject:
         controller:
